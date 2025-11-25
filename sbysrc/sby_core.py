@@ -1272,7 +1272,7 @@ class SbyTask(SbyConfig):
                 print("abc -g AND -fast", file=f)
                 print("opt_clean", file=f)
                 print("stat", file=f)
-                print(f"write_aiger -I -B -zinit -no-startoffset {'-vmap' if self.opt_aigvmap else '-map'} design_aiger.aim" +
+                print(f"write_aiger -I -B -zinit -no-startoffset -symbols {'-vmap' if self.opt_aigvmap else '-map'} design_aiger.aim" +
                         f"{' -symbols' if self.opt_aigsyms else ''} -ywmap design_aiger.ywa design_aiger.aig", file=f)
 
             proc = SbyProc(
