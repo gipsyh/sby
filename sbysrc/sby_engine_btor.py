@@ -73,17 +73,9 @@ def run(mode, task, engine_idx, engine):
         if task.opt_skip is not None:
             task.error("The btor engine supports the option skip only for the btormc solver.")
         if mode == "prove":
-            solver_cmd = " ".join([task.exe_paths["rIC3"], "--witness"] + solver_args[1:])
+            solver_cmd = task.exe_paths["ric3"] + " check --witness portfolio"
         elif mode == "bmc":
-            solver_cmd = " ".join(
-                [
-                    task.exe_paths["rIC3"],
-                    "-e bmc",
-                    "--end {}".format(task.opt_depth - 1),
-                    "--witness",
-                ]
-                + solver_args[1:]
-            )
+            solver_cmd = task.exe_paths["ric3"] + f" check --witness bmc --end {task.opt_depth - 1}"
         else:
             task.error("The rIC3 solver is only supported in bmc and prove modes.")
     else:
@@ -317,17 +309,24 @@ def run(mode, task, engine_idx, engine):
         if (common_state.running_procs == 0):
             print_traces_and_terminate()
 
+    # For rIC3, find "check" in solver_cmd and insert model_path after it
+    # Command format: ric3 check <model> --witness <engine>
+    if solver_args[0] == "rIC3":
+        model_path = f"model/design_{model_name}.btor"
+        check_idx = solver_cmd.find(" check") + len(" check")
+        proc_cmd = f"cd {task.workdir}; {solver_cmd[:check_idx]} {model_path}{solver_cmd[check_idx:]}"
+    else:
+        proc_cmd = f"cd {task.workdir}; {solver_cmd} model/design_{model_name}{'_single' if solver_args[0] == 'pono' else ''}.btor"
+
     proc = SbyProc(
         task,
         f"engine_{engine_idx}", task.model(model_name),
-        f"cd {task.workdir}; {solver_cmd} model/design_{model_name}{'_single' if solver_args[0] == 'pono' else ''}.btor",
+        proc_cmd,
         logfile=open(f"{task.workdir}/engine_{engine_idx}/logfile.txt", "w")
     )
     proc.checkretcode = True
     if solver_args[0] == "pono":
         proc.retcodes = [0, 1, 255] # UNKNOWN = -1, FALSE = 0, TRUE = 1, ERROR = 2
-    if solver_args[0] == "rIC3":
-        proc.retcodes = [10, 20, 30] # FALSE = 10, TRUE = 20, UNKNOWN = 30
     proc.output_callback = output_callback
     proc.register_exit_callback(exit_callback)
     common_state.running_procs += 1

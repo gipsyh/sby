@@ -51,17 +51,9 @@ def run(mode, task, engine_idx, engine):
         if mode not in ["bmc", "prove"]:
             task.error("The aiger solver 'rIC3' is only supported in bmc and prove mode.")
         if mode == "prove":
-            solver_cmd = " ".join([task.exe_paths["rIC3"], "--witness"] + solver_args[1:])
+            solver_cmd = task.exe_paths["ric3"] + " check --witness portfolio"
         if mode == "bmc":
-            solver_cmd = " ".join(
-                [
-                    task.exe_paths["rIC3"],
-                    "-e bmc",
-                    "--end {}".format(task.opt_depth - 1),
-                    "--witness",
-                ]
-                + solver_args[1:]
-            )
+            solver_cmd = task.exe_paths["ric3"] + f" check --witness bmc --end {task.opt_depth - 1}"
             status_2 = "PASS"  # rIC3 outputs status 2 when BMC passes
 
     elif solver_args[0] == "aigbmc":
@@ -97,11 +89,21 @@ def run(mode, task, engine_idx, engine):
         else:
             sim_append = task.opt_append
 
+    # For rIC3, find "check" in solver_cmd and insert model_path after it
+    # Command format: ric3 check <model> --witness <portfolio/bmc> [--end XXX]
+    if solver_args[0] == "rIC3":
+        model_path = f"model/design_aiger{model_variant}.aig"
+        # Insert model_path after "check"
+        check_idx = solver_cmd.find(" check") + len(" check")
+        proc_cmd = f"cd {task.workdir}; {solver_cmd[:check_idx]} {model_path}{solver_cmd[check_idx:]}"
+    else:
+        proc_cmd = f"cd {task.workdir}; {solver_cmd} model/design_aiger{model_variant}.aig"
+
     proc = SbyProc(
         task,
         f"engine_{engine_idx}",
         task.model(f"aig{model_variant}"),
-        f"cd {task.workdir}; {solver_cmd} model/design_aiger{model_variant}.aig",
+        proc_cmd,
         logfile=open(f"{task.workdir}/engine_{engine_idx}/logfile.txt", "w")
     )
     if solver_args[0] not in ["avy", "rIC3"]:
